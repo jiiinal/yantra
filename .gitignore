@@ -12,3 +12,4 @@ __pycache__/
 # Virtualenv
 venv/
 db.sqlite3
+.idea/*
