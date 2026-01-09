@@ -3,6 +3,8 @@
 
 # Python
 __pycache__/
+*/__pycache__/
+*/*/__pycache__/
 *.pyc
 
 # IDEs
@@ -13,3 +15,5 @@ __pycache__/
 venv/
 db.sqlite3
 .idea/*
+requirements.txt
+*.log
