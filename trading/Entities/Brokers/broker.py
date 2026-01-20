@@ -23,14 +23,14 @@ EXCHANGE_SESSIONS = {
     'NSE': [(time(9, 15, 0), time(15, 30, 0))],
     'CDS': [(time(9, 0, 0), time(17, 0, 0))],
     'MCX': [(time(9, 0, 0), time(23, 55, 0))],
-} 
+}
 class Broker():
     ANGEL       = 1
     ZERODHA     = 2
     FINVASIA    = 3
     FYERS       = 4
     BNRATHI     = 5
-    ALICEBLUE   = 6      
+    ALICEBLUE   = 6
     def __init__(self, brokerId) -> None:
         self.BrokerId = brokerId
 
@@ -38,19 +38,19 @@ class Broker():
     def getMarketSessions(self, exchange, TTLHash = get_ttl_hash(CACHE_SETTINGS.REFRESH_CACHE_DAILY)):
         del TTLHash
 
-        qFilter = Q(broker__brokerId = self.BrokerId, exchange__code = exchange)        
+        qFilter = Q(broker__brokerId = self.BrokerId, exchange__code = exchange)
         sessions = MarketSessions.objects.filter(qFilter)
         if sessions:
-            marketSessions =  [(session.startTime,session.EndTime) for session in sessions]    
+            marketSessions =  [(session.startTime,session.EndTime) for session in sessions]
             return marketSessions
         else:
             exchange = Exchange(exchange)
             marketSessions = exchange.getMarketSessions()
             if marketSessions:
                 return  marketSessions
-            else:           
-                marketSessions = EXCHANGE_SESSIONS.get(exchange.Exchange)    
-                return marketSessions        
+            else:
+                marketSessions = EXCHANGE_SESSIONS.get(exchange.Exchange)
+                return marketSessions
 
     def getQueueId(self, type, userid, function):
         '''
@@ -63,10 +63,10 @@ class Broker():
         '''
         QueueId = f'M{type}{str(userid)}{function}'
         if type not in ['Q','A']:
-             
-            QueueId = None 
+
+            QueueId = None
         if function not in ['O','T']:
-            QueueId = None 
+            QueueId = None
 
         return QueueId
 
@@ -78,7 +78,7 @@ class Broker():
             if broker:
                 module = importlib.import_module('trading.Entities.Brokers.' + broker.className.lower())
                 class_ = getattr(module, broker.className)
-                instance = class_(brokerId, accountId)   
+                instance = class_(brokerId, accountId)
         except Exception as e:
             logger.debug(e)
         finally:
@@ -86,17 +86,17 @@ class Broker():
 
     # @property
     def canPlaceOrder(self, exchSeg = 'MCX', wait=60, count = 15):
-        # return True
-        
+        return True
+
         if wait > 0:
             count += 1
 
         MarketOpen = False
-       
-        sessions = self.getMarketSessions(exchSeg) 
-        while count:                   
+
+        sessions = self.getMarketSessions(exchSeg)
+        while count:
             currDate = datetime.now(pytz.timezone('Asia/Kolkata'))
-            currTime = currDate.time()             
+            currTime = currDate.time()
             for session in sessions:
                 if currTime >= session[0] and currTime <= session[1] and currDate.weekday() < 6:
                     MarketOpen = True
@@ -106,19 +106,19 @@ class Broker():
                 sleep(wait)
                 count -= 1
         return MarketOpen
-    
+
 
     def isMarketOpen(self, exchSeg = 'NSE', wait=60, count = 15):
-        # return True
+        return True
         # exchange = Exchange(exchSeg)
         if wait > 0:
             count += 1
-        sessions = self.getMarketSessions(exchSeg) 
-        
+        sessions = self.getMarketSessions(exchSeg)
+
         while count:
-            
+
             currDate = datetime.now(pytz.timezone('Asia/Kolkata'))
-            currTime = currDate.time()  
+            currTime = currDate.time()
             startTime = sessions[0][0]
             endTime = sessions[-1][1]
 
@@ -127,7 +127,7 @@ class Broker():
             else:
                 if count > 0:
                     sleep(wait)
-                    count -= 1                
+                    count -= 1
                 else:
                     return False
 
@@ -148,7 +148,7 @@ class Broker():
         return symbols
 
 
-    
+
     @lru_cache(maxsize=64)
     def getScript(self, exchSeg, token, symbol=None, TTLHash = get_ttl_hash(CACHE_SETTINGS.REFRESH_CACHE_DAILY)):
         ''' get script as per the broker. 
@@ -161,7 +161,7 @@ class Broker():
         del TTLHash
         if isBlankOrNone(token) and isBlankOrNone(symbol):
             return None
-        
+
         if not isBlankOrNone(token) and isBlankOrNone(symbol) == False:
             symbol = None
 
@@ -200,8 +200,8 @@ class Broker():
             return None
 
     def VerboseOrder(
-            self, variety, exchange, token, symbol, tranType, priceType, prodType, price, quantity, 
-            disclQty, validity = 'DAY', stopPrice = 0, stopLoss = 0, takeProfit = 0, orderId ='', 
+            self, variety, exchange, token, symbol, tranType, priceType, prodType, price, quantity,
+            disclQty, validity = 'DAY', stopPrice = 0, stopLoss = 0, takeProfit = 0, orderId ='',
             orderCategory = 'Normal', gttBuyBuffer = 0, gttSellBuffer = 0):
         # script = self.getScript(exchange,symbol,token)
         tsymb = symbol
@@ -209,7 +209,7 @@ class Broker():
         script = Scripts.objects.filter(exchSeg=exchange,token=token).first()
         if script == None:
             return None
-        
+
         if exchange == 'CDS' and prodType == 'DELIVERY':
             prodType = 'MARGIN'
             if self.BrokerId in [Broker.FINVASIA, Broker.BNRATHI]:
@@ -226,20 +226,20 @@ class Broker():
             "orderId"       : orderId,
             "variety"       : variety,
             "exchSeg"       : exchange,
-            "symbol"        : tsymb, 
-            "token"         : script.token,            
+            "symbol"        : tsymb,
+            "token"         : script.token,
             "tranType"      : tranType,
-            "priceType"     : priceType, 
-            "productType"   : prodType,            
+            "priceType"     : priceType,
+            "productType"   : prodType,
             "price"         : round(price,2),
-            "quantity"      : quantity,            
+            "quantity"      : quantity,
             "stopLoss"      : round(stopLoss,2),
             "validity"      : validity,
             "stopPrice"     : round(stopPrice,2),
             "takeProfit"    : round(takeProfit,2),
-            "disclosedQty"  : disclQty, 
+            "disclosedQty"  : disclQty,
             "orderCategory" : orderCategory,
-            "gttBuyBuffer"  : gttBuyBuffer, 
+            "gttBuyBuffer"  : gttBuyBuffer,
             "gttSellBuffer" : gttSellBuffer
             }
         lstVerbose.append(order)

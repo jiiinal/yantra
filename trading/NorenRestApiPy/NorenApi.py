@@ -522,7 +522,7 @@ class NorenApi:
         return resDict
 
     def modify_order(self, orderno, exchange, tradingsymbol, newquantity,
-                    newprice_type, newprice=0.0, newtrigger_price=None, bookloss_price = 0.0, bookprofit_price = 0.0, trail_price = 0.0):
+                    newprice_type, newprice=0.0, newtrigger_price=None, bookloss_price = 0.0, bookprofit_price = 0.0, trail_price = 0.0, remarks=None):
         config = NorenApi.__service_config
 
         #prepare the uri
@@ -539,6 +539,7 @@ class NorenApi:
         values["qty"]           = str(newquantity)
         values["prctyp"]        = newprice_type        
         values["prc"]           = str(newprice)
+        values["remarks"] = remarks
 
         if (newprice_type == 'SL-LMT') or (newprice_type == 'SL-MKT'):
             if (newtrigger_price != None):

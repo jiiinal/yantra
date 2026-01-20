@@ -201,6 +201,7 @@ def getSwingLogs(user_id, trade_date):
 @api_view(["GET"])
 def getSwingTrades(request):
     try:
+        print(f"received request for swing trades, {request.user}")
         # Unified way to support both GET (query params) and POST (JSON body)
         query_params = request.query_params or request.data or request.GET
 
@@ -216,7 +217,7 @@ def getSwingTrades(request):
 
         return Response({
             'status': 'success',
-            'message': logs.values()
+            'message': logs
         })
 
     except Exception as e:
