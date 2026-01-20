@@ -180,9 +180,9 @@ def testConnection(request):
     else:
         ba = BrokerAccount(request.user)
         id = int(request.data.get('id'))
-        logger.debug('Test connection started',request.user)
+        logger.debug(f'Test connection started {request.user}')
         ba.Connect(id)
-        logger.debug('Test connection completed',request.user)
+        logger.debug(f'Test connection completed {request.user}')
         bo = ba.getBrokerObject(id)
         try:
             quote = bo.ConnectionObject.get_quotes('NSE','2885')
