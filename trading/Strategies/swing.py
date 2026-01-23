@@ -552,7 +552,7 @@ class Swing(Strategy):
             else:  # SELL
                 # Price opened low - place SELL slightly below CMP
                 order_price = round(cmp - buffer, 2)
-                lot_size = setup.lot * missed_levels  # Multiple lots for missed SELLs
+                lot_size = (setup.slLot if setup.useSlLot else setup.lot ) * missed_levels  # Multiple lot or slLot based on config for missed SELLs
 
             lock_key = get_redis_lock_key(userid, targetId, self.code, setup.token, exchange_code, order_type, order_price)
             # Try acquiring lock
