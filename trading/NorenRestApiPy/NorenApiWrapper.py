@@ -53,10 +53,12 @@ class BuyorSell:
     Buy = 'B'
     Sell = 'S'
 
+
 class AlertType:
     LTP_ABOVE = 'LTP_A_O'
     LTP_BELOW = 'LTP_B_O'
     LTP_OCO = 'LMT_BOS_O'
+
 
 def reportmsg(msg):
     # print(msg)
@@ -74,10 +76,9 @@ def reportinfo(msg):
 
 
 class NorenApi(object):
-
     TRANSACTION_TYPE_SELL = 'S'
     TRANSACTION_TYPE_BUY = 'B'
-    
+
     PRODUCT_TYPE_INTRADAY = 'I'
     PRODUCT_TYPE_DELIVERY = 'C'
     PRODUCT_TYPE_NORMAL = 'M'
@@ -156,7 +157,7 @@ class NorenApi(object):
         while self.__stop_event.is_set() == False:
             try:
                 self.__websocket.run_forever(
-                    ping_interval=3,  ping_payload='{"t":"h"}')
+                    ping_interval=3, ping_payload='{"t":"h"}')
             except Exception as e:
                 logger.warning(
                     f"websocket run forever ended in exception, {e}")
@@ -549,6 +550,10 @@ class NorenApi(object):
         values["remarks"] = remarks
         values["amo"] = amo
 
+        if (values.get('prctyp', 'LMT') == 'SL-MKT' or values.get('prctype', 'LMT') == 'SL-LMT') and values["trgprc"] == "None":
+            values["trgprc"] = str(price)
+            values["prc"] = str(0)
+
         # if cover order or high leverage order
         if product_type == 'H':
             values["blprc"] = str(bookloss_price)
@@ -578,7 +583,7 @@ class NorenApi(object):
         return resDict
 
     def modify_order(self, orderno, exchange, tradingsymbol, newquantity,
-                     newprice_type, newprice=0.0, newtrigger_price=None, bookloss_price=0.0, bookprofit_price=0.0, trail_price=0.0,remarks=None):
+                     newprice_type, newprice=0.0, newtrigger_price=None, bookloss_price=0.0, bookprofit_price=0.0, trail_price=0.0, remarks=None):
         config = NorenApi.__service_config
 
         # prepare the uri
@@ -597,12 +602,13 @@ class NorenApi(object):
         values["prc"] = str(newprice)
         values["remarks"] = remarks
 
-        if (newprice_type == 'SL-LMT') or (newprice_type == 'SL-MKT'):
+        if (newprice_type == 'SL-LMT' or newprice_type == 'SL-MKT'):
             if (newtrigger_price != None):
-                values["trgprc"] = str(newtrigger_price)
+                values["trgprc"] = str(newtrigger_price) if newtrigger_price != None else str(newprice)
             else:
-                reporterror('trigger price is missing')
-                return None
+                values["trgprc"] = str(newprice)
+                print("Trigger price set to price and price set to 0 for SL order modification")
+            values["prc"] = str(0)
 
         # if cover order or high leverage order
         if bookloss_price != 0.0:
@@ -1086,8 +1092,8 @@ class NorenApi(object):
         senddata['actid'] = self.__accountid
         senddata['pos'] = positions
         payload = 'jData=' + \
-            json.dumps(senddata, default=lambda o: o.encode()) + \
-            f'&jKey={self.__susertoken}'
+                  json.dumps(senddata, default=lambda o: o.encode()) + \
+                  f'&jKey={self.__susertoken}'
         reportmsg(payload)
 
         res = requests.post(url, data=payload)
@@ -1150,7 +1156,7 @@ class NorenApi(object):
             return None
 
         return resDict
-    
+
     def get_enabled_gtt_orders(self):
         config = NorenApi.__service_config
 
@@ -1176,22 +1182,22 @@ class NorenApi(object):
             return None
 
         return resDict
-    
+
     def place_gtt_order(
-        self,
-        tradingsymbol,
-        exchange,
-        alert_type, # 'LTP_A_O' or 'LTP_B_O'
-        alert_price,
-        buy_or_sell, # 'B' or 'S'
-        product_type, # 'I' Intraday, 'C' Delivery, 'M' Normal Margin for options
-        quantity,
-        price_type='MKT',
-        price=0.0,
-        remarks = None,
-        retention= 'DAY',
-        validity = 'GTT',
-        discloseqty=0,
+            self,
+            tradingsymbol,
+            exchange,
+            alert_type,  # 'LTP_A_O' or 'LTP_B_O'
+            alert_price,
+            buy_or_sell,  # 'B' or 'S'
+            product_type,  # 'I' Intraday, 'C' Delivery, 'M' Normal Margin for options
+            quantity,
+            price_type='MKT',
+            price=0.0,
+            remarks=None,
+            retention='DAY',
+            validity='GTT',
+            discloseqty=0,
     ):
         # prepare the uri
         config = NorenApi.__service_config
@@ -1227,7 +1233,7 @@ class NorenApi(object):
             return None
 
         return resDict['al_id']
-    
+
     def cancel_gtt_order(self, orderno):
         config = NorenApi.__service_config
 
