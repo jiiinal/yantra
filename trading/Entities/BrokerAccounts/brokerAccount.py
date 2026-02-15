@@ -52,7 +52,7 @@ class BrokerAccount():
     #         raise Exception('No Default/Specific Account found ')
 
     def Connect(self, accountId=None, sessionOnly=False):
-        # logging.debug(f'connection attempted for Account Id {accountId}')
+        logging.debug(f'connection attempted for Account Id {accountId}')
         lstBrokerObject = []
         accounts = self.getAccount(accountId)
         for account in accounts:

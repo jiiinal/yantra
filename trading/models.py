@@ -51,6 +51,7 @@ class Scripts(models.Model):
     symbolFinvasia  = models.CharField(max_length=40,default='') 
     name            = models.CharField(max_length=40) 
     expiry          = models.CharField(max_length=40, null=True, blank=True)
+    expiryDate     = models.DateField(null=True, blank=True, db_index=True)
     strike          = models.DecimalField(max_digits=30,decimal_places=10)
     lotSize         = models.IntegerField()
     instrumentType  = models.CharField(max_length=24) 
@@ -63,6 +64,16 @@ class Scripts(models.Model):
     multiplier      = models.IntegerField(default=2)
     def __str__(self):
         return self.symbol + '-' + self.name + '-' + self.token    
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['exchSeg', 'symbol']),
+            models.Index(fields=['exchSeg', 'token']),
+            models.Index(fields=['token']),
+            models.Index(fields=['symbol']),
+            models.Index(fields=['exchSeg', 'instrumentType']),
+        ]
+
 
 class Strategis(models.Model):
     code        = models.CharField(max_length=20, null=True, blank=True, default = '')
@@ -130,6 +141,10 @@ class JobbingLog(models.Model):
     def __str__(self):
         return self.token + '-' + str(self.tradeDate) + '-' + str(self.target_id)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["user_id", "tradeDate"]),
+        ]
 
 
 class SwingSettings(UserAudit):
@@ -180,3 +195,8 @@ class SwingLog(models.Model):
 
     def __str__(self):
         return self.status + '-' + self.orderType + '-' + str(self.tradeDate) + '-' + str(self.target_id)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user_id", "tradeDate"]),
+        ]

@@ -85,12 +85,25 @@ class JobbingSettingSerializer(IsOwenerModelSerializer):
 
 
 class SwingSettingsDetailSerializer(IsOwenerModelSerializer):
+    """Used for GET requests - includes nested objects"""
     exchange = ExchangeSerializer(read_only=True)
     target = BrokerAccountSerializer(read_only=True)
 
     class Meta:
         model = SwingSettings
         fields = '__all__'
+
+
+class SwingSettingsWriteSerializer(IsOwenerModelSerializer):
+    """Used for POST/PUT/PATCH requests - uses IDs only"""
+
+    class Meta:
+        model = SwingSettings
+        fields = '__all__'
+        extra_kwargs = {
+            'created_by': {'read_only': True},
+            'created_at': {'read_only': True},
+        }
 
 
 class SwingSettingsSerializer(IsOwenerModelSerializer):

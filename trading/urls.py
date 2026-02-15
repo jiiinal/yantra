@@ -1,6 +1,6 @@
 from django.urls import path
 from trading.views.jobs import testConnection, startStrategy, terminateStrategy, getSymbols, getTimeSeriesData
-from trading.views.masterdata import syncSymbolsReq
+from trading.views.masterdata import syncSymbolsReq, syncSymbolsExpiry
 from trading.apis.endpoint import (BrokerAccountList, BrokerAccountDetail,
                                    JobbingSettingList, JobbingSettingDetail,
                                    BrokerDetail, BrokerList, getSwingTrades,
@@ -18,6 +18,7 @@ def sendMail(request):
 
 urlpatterns = [
     path('symbols/sync/', syncSymbolsReq, name='symbols-sync'),
+    path('symbols/sync/expiry/', syncSymbolsExpiry, name='symbols-sync'),
     path('symbols/', getSymbols, name='symbols'),
 
     path('strategy/start/', startStrategy, name='start-strategy'),

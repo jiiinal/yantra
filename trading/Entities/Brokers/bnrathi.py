@@ -207,6 +207,7 @@ class BNRathi(Broker):
 
                 if isBlankOrNone(self.Account.factor2):
                     factor2 = self.getTOTP()
+                    logger.debug(f'Factor2: {factor2}')
                 else:
                     factor2 = self.Account.factor2
 

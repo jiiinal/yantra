@@ -18,7 +18,7 @@ from trading.models import (
 from trading.serializers import (
     BrokerAccountSerializer, BrokerAccountDetSerializer,
     BrokerSerialzer, JobbingSettingDetSerializer, JobbingSettingSerializer,
-    ExchangeSerializer, SwingSettingsSerializer, SwingSettingsDetailSerializer, SwingLogSerializer
+    ExchangeSerializer, SwingSettingsSerializer, SwingSettingsDetailSerializer, SwingLogSerializer, SwingSettingsWriteSerializer
 )
 
 
@@ -162,16 +162,19 @@ class SwingTradingSettingList(GenericsListCreateAPIView):
 
 
 class SwingSettingDetail(GenericsRetrieveUpdateDestroyAPIView):
-    queryset = SwingSettings.objects.all()
+    permission_classes = [IsOwnerPermission]
+
+    def get_queryset(self):
+        queryset = SwingSettings.objects.all()
+        if self.request.method == 'GET':
+            # Optimize N+1 queries for nested serializers
+            queryset = queryset.select_related('exchange', 'target')
+        return queryset
 
     def get_serializer_class(self):
         if self.request.method == 'GET':
             return SwingSettingsDetailSerializer
-        return SwingSettingsDetailSerializer
-
-    # lookup_field = 'project'
-    # filter_backends = [IsAllowedFilterBackend]
-    permission_classes = [IsOwnerPermission]
+        return SwingSettingsWriteSerializer
 
 
 def getSwingLogs(user_id, trade_date):
