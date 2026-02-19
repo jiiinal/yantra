@@ -1,4 +1,5 @@
 from celery import shared_task
+from django.utils import timezone
 
 from trading.Strategies import swing
 from trading.models import Scripts
@@ -8,7 +9,7 @@ from datetime import datetime
 @shared_task(bind=True)
 def fillScriptsExpiryDate(self):
     try:
-        scripts = Scripts.objects.exclude(expiry__isnull=True).exclude(expiry='')
+        scripts = Scripts.objects.exclude(expiry__isnull=True).exclude(expiry='').exclude(expiryDate__isnull=False)
 
         updated_count = 0
         failed_count = 0
@@ -17,7 +18,7 @@ def fillScriptsExpiryDate(self):
             try:
                 expiry_date = parse_flexible_date(script.expiry)
                 if expiry_date:
-                    script.expiry_date = expiry_date
+                    script.expiryDate = expiry_date
                     script.save(update_fields=['expiryDate'])
                     updated_count += 1
                 else:
@@ -27,8 +28,11 @@ def fillScriptsExpiryDate(self):
                 print(f"Error processing script {script.id}: {script.expiry} - Error: {e}")
                 failed_count += 1
 
-        print(f"Updated {updated_count} scripts with expiry_date")
+        print(f"Updated {updated_count} scripts with expiryDate")
         print(f"Failed to parse {failed_count} scripts")
+        today = timezone.now().date()
+        deleted_count, _ = Scripts.objects.filter(expiryDate__lt=today).delete()
+        print(f"SyncSymbolsExpiry Deleted {deleted_count} expired scripts")
 
     except Exception as e:
         print(f"Task failed: {str(e)}")

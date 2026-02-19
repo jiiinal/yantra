@@ -17,7 +17,7 @@ from trading.Redis.pubsub import PubSub
 from trading.Strategies.strategy import Strategy
 from trading.Strategies.strategyManager import StrategyManager
 from trading.models import BrokerAccounts, Strategis, Scripts
-from trading.tasks import fillScriptsExpiryDate
+from trading.tasks import fillScriptsExpiryDate, parse_flexible_date
 
 FINVASIA_SYMBOLS_NSE_PATH = {
     'NSE': 'https://api.shoonya.com/NSE_symbols.txt.zip',
@@ -126,12 +126,14 @@ class MasterDataManager():
         # clear old scripts which are expired before today
         today = timezone.now().date()
         deleted_count, _ = Scripts.objects.filter(expiryDate__lt=today).delete()
-        print(f"Deleted {deleted_count} expired scripts")
+        print(f"SyncSymbolsStart Deleted {deleted_count} expired scripts")
         self.syncNSEBSESymbols('NSE')
         self.syncNSEBSESymbols('BSE')
         self.syncNFOMCXSymbols('MCX')
         self.syncNFOMCXSymbols('NFO')
         self.syncCDSSymbols()
+        deleted_count, _ = Scripts.objects.filter(expiryDate__lt=today).delete()
+        print(f"SyncSymbolsEnd Deleted {deleted_count} expired scripts")
         # return True
 
     def syncNSEBSESymbols(self, exchange='NSE'):
@@ -173,6 +175,8 @@ class MasterDataManager():
             scripts = Scripts.objects.filter(exchSeg=exchange)
             if self.BrokerId == Broker.FINVASIA:
                 df = pd.read_csv(FINVASIA_SYMBOLS_NSE_PATH.get(exchange))
+            else:
+                df = pd.DataFrame()
 
             for index, row in df.iterrows():
                 # Exchange,Token,LotSize,Symbol,TradingSymbol,Expiry,Instrument,OptionType,StrikePrice,TickSize
@@ -182,7 +186,7 @@ class MasterDataManager():
 
                     if expiry_str:
                         try:
-                            expiry_date = datetime.strptime(expiry_str, '%d-%b-%Y').date()
+                            expiry_date = parse_flexible_date(expiry_str)
                         except ValueError:
                             pass
                     new = Scripts(
