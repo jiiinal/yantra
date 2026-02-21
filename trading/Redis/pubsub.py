@@ -37,6 +37,7 @@ class PubSub():
         return True
     
     def subscribe(self, channels):
+        print("subscribed to channels", channels)
         # "my-channel-1", "my-channel-2"
         self.pubsub.subscribe(channels)
         return True

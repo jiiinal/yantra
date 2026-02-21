@@ -1,3 +1,5 @@
+import traceback
+
 from trading.models import JobbingSettings, StrategyStatus, Strategis, JobbingLog
 from social.views.telegram import Telegram
 # from trading.views.Entities.brokerAccount import BrokerAccount
@@ -62,7 +64,7 @@ class Jobbing(Strategy):
     def getActiveSetup(self, exchange=None):
         lstActiveAccounts = []
         lstActiveScripts = []
-        self.Setups = JobbingSettings.objects.select_related().filter(user = self.User, isActive = True, target__isActive = True).order_by('target_id','exchange')
+        self.Setups = JobbingSettings.objects.select_related().filter(user=self.User, isActive=True, target__isActive=True).order_by('target_id', 'exchange')
         if not exchange:
             exchange = self.exchange
             
@@ -76,12 +78,17 @@ class Jobbing(Strategy):
                 lstActiveAccounts.append(setup.target.id)      
 
             activeScript = {
-                'accountId'     : setup.target.id,
-                'clientId'      : setup.target.clientId,
-                'brokerId'      : setup.target.broker.brokerId,
-                'exchange'      : setup.exchange,
-                'token'         : setup.token,
-                'symbol'        : setup.symbol,
+                # 'OrderQId'      : broker.getQueueId(self.User.username,setup.target.clientId,setup.exchange,'O') if self.requireOrderCallback else None,
+                # 'TickQId'       : broker.getQueueId(self.User.username,setup.target.clientId,setup.exchange,'T') if self.requireTickCallback else None,
+                # 'strategyCode'  : self.code,
+                'accountId': setup.target.id,
+                'clientId': setup.target.clientId,
+                'brokerId': setup.target.broker.brokerId,
+                'exchange': setup.exchange,
+                'token': setup.token,
+                'symbol': setup.symbol,
+                # 'rolloverToken' : setup.rolloverToken if setup.rolloverActive else None,
+                # 'rolloverDays'  : setup.rolloverDays if setup.rolloverActive else None
             }
             if activeScript not in lstActiveScripts:
                 lstActiveScripts.append(activeScript)             
@@ -197,7 +204,7 @@ class Jobbing(Strategy):
             sleep(2)
             self.createInitialOrder(brokerAccount)
             self.telegram.sendMessage(f'{self.code} : Initial Order Placed')
-            
+
         except Exception as e:
             logger.debug(f"jobbing start error {str(e)}")
 
@@ -535,7 +542,6 @@ class Jobbing(Strategy):
 
 # @transaction.atomic
 
-# Irfat to over ride this method
 @shared_task(bind=True)
 def workerS1OrderCallback(self, strategyCode, accId, exchange, cancelOld = True):
     accountId = int(accId)
@@ -582,12 +588,11 @@ def workerS1OrderCallback(self, strategyCode, accId, exchange, cancelOld = True)
             #     sleep(2)
             continue
         try:
-                        
+            print(f"Jobbing callback for order {ord}")
             # print(f'Read data {ord} for QID {OrderQId}')
             logger.warning(ord)
-            if ord.get('type','') == 'TERMINATE':
-                logger.debug
-                if  ord.get('strategy',strategy.code) == strategy.code and ord.get('exchange',exchange) == exchange and  ord.get('accountId',accId) == accId:
+            if ord.get('type', '') == 'TERMINATE':
+                if ord.get('strategy', strategy.code) == strategy.code and ord.get('exchange', exchange) == exchange and ord.get('accountId', accId) == accId:
                     logger.debug(f'Termianted {strategy.code}:{exchange}:Acc{accId}')
                     pubsub.clear_message()
                     break
@@ -604,9 +609,112 @@ def workerS1OrderCallback(self, strategyCode, accId, exchange, cancelOld = True)
                 logger.error(f'invalid order data {ord}')
                 continue
 
-            # @Irfat - Write your code here
+            buyOnly = False
+            sellOnly = False
+
+            logTrade = False
+            flagReverseTick = False
+            if ord['status'] == 'COMPLETE':
+                logTrade = True
+            else:
+                continue
+                #     currLog = JobbingLog.objects.filter( target_id = accountId, orderId = ord['orderId']).first()
+            #     if currLog:
+            #         # currLog = Strategy1Log.objects.select_for_update().get(id=currLog.id)
+            #         if currLog.status != ord.get('status') and not isBlankOrNone(ord.get('status')):
+            #             currLog.status = ord['status']
+            #             currLog.updatedOn   = datetime.now(pytz.timezone('Asia/Kolkata'))
+            #             currLog.save()
+            #             logger.info(f"Order log status updated {ord.get('orderId')} {currLog.status}")
+            #     continue
+            setup = strategy.Setups.filter(exchange__code=ord['exchSeg'], token=ord['token'], target_id=accountId).first()
+            if setup:
+                currStock = setup.stockCurrent
+            else:
+                currStock = 0
+                logger.error(f"No setup found for {ord['exchSeg']} : {ord['token']}")
+                telegram.sendMessage(f"No setup found for {ord['exchSeg']} : {ord['token']}")
+                continue
+
+            # logStock = JobbingLog.objects.filter(user = strategy.User, exchange__code = ord['exchSeg'], token = ord['token'], status = 'COMPLETE').order_by('-updatedOn').first()
+            # if logStock:
+            #     currStock = logStock.currStock
+            # else:
+            #     currStock = setup.stockCurrent
+
+            currLog = JobbingLog.objects.filter(target_id=accountId, orderId=ord['orderId']).first()
+            if currLog:
+
+                if currLog.status in ['COMPLETE']:
+                    continue
+
+                if strategy.isActive == False:  # broker.canPlaceOrder(exchange.code) and
+                    continue
+
+                lotSizeBuy = setup.buyLot
+                lotSizeSell = setup.sellLot
+                basePrice = Decimal(ord['limitPrice'])
+                if ord['tranType'] == 'BUY':
+
+                    currStock += currLog.quantity
+                    setup.stockCurrent = currStock
+
+                else:
+                    flagReverseTick = True
+
+                    currStock -= currLog.quantity
+                    setup.stockCurrent = currStock
+
+                currLog.status = ord.get('status')
+                # currLog.price       = ltp
+                currLog.currStock = currStock
+                currLog.updatedOn = datetime.now(pytz.timezone('Asia/Kolkata'))
+                currLog.save()
+                logger.debug(f'after saving in db {currLog.status} {currLog.orderId} Qty:{currStock}')
+                setup.priceCurrent = basePrice
+                setup.save()
+                message = f"User:{ba.user}, {ord['tranType']}-{setup.exchange.code}:{ord['symbol']} - Qty ( {currLog.quantity} @ {basePrice} )"
+                telegram.sendMessage(message)
+                logger.info(message)
+                # strategy.Telegram.sendMessage(message)
+
+                # if waitForMarketOpen(0, setup.exchange) == False:
+                #     print(f'Market {setup.exchange} closed, terminating worker')
+                #     # strategy.ConnectionObject.closeWebSocket(ws)
+                #     strategy.setStatus('TERMINATE')
+                #     return
+
+                if logTrade and setup:
+                    if setup.stockCurrent >= setup.stockMax:
+                        sellOnly = True
+                    if setup.stockCurrent <= setup.stockMin:
+                        buyOnly = True
+                    # telegram.sendMessage('Trying to place subsequent order')
+                    logger.debug(f'work order pair initiating for {setup.exchange.code}:{setup.token} {basePrice}')
+                    if broker.canPlaceOrder(exchange):
+
+                        workerOrderPair(strategy.code, strategy.User.id, setup.target.id, setup.exchange.code, setup.token, 1,
+                                        basePrice, lotSizeBuy, setup.buyTick,
+                                        buyOnly, sellOnly, setup.simulate, setup.sellTick, setup.sellLot, flagReverseTick)
+                    else:
+                        t1 = Thread(target=workerOrderPair,
+                                    args=(
+                                        strategy.code, strategy.User.id, setup.target.id, setup.exchange.code, setup.token, 1,
+                                        basePrice, lotSizeBuy, setup.buyTick,
+                                        buyOnly, sellOnly, setup.simulate, setup.sellTick, setup.sellLot, flagReverseTick
+                                    )
+                                    )
+                        t1.start()
+
+                    logger.debug(f'work order pair completed for {setup.exchange.code}:{setup.token} {basePrice}')
+                    # sleep(1)
+                    # workerOrderPair.delay(strategy.code, strategy.User.id, setup.target.id, setup.exchange, setup.token, 1,
+                    #                 basePrice, lotSizeBuy,setup.buyTick,
+                    #                 buyOnly, sellOnly, setup.simulate, setup.sellTick, setup.sellLot, flagReverseTick)
+
 
         except Exception as exc:
+            traceback.print_exc()
             # pubsub.unsubscribe(OrderQId)
             logger.error(exc)                
             # telegram.sendMessage('Error processing cycle order update callback')
